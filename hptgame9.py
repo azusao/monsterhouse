@@ -1,10 +1,33 @@
 import pyxel
 import random
 import math
+import time
 
 SCENE_TITLE = 0
 SCENE_PLAY = 1
 SCENE_GAMEOVER = 2
+
+class Clock:
+  # 最初の位置と色を(x,y,c)で指定してインスタンス生成
+  # 起動時からの時間を計算するために、起動時の時刻を記憶する
+  # time.time()はUTCの1970年1月1日0時0分0秒からの経過秒数を返す
+  def __init__(self,x,y,c):
+    self.x = x
+    self.y = y
+    self.c = c
+    self.sec = 0
+    self.min = 0
+    self.start = time.time()
+
+  # 更新ごとに経過秒数を設定する
+  def update(self):
+    self.sec = math.floor(time.time() - self.start)
+    self.min = self.sec // 60
+
+  # 分数と秒数を表示
+  # %を使った構文は、数値を文字列として表示する方法の一つ
+  def draw(self):
+    pyxel.text(self.x,self.y,"Time: %02d:%02d" % (self.min,self.sec%60),self.c)
 
 class Ball:
     def __init__(self, app):
@@ -94,18 +117,34 @@ class Target:
     def draw(self):
         pyxel.blt(self.x, self.y, 0, 0, 0, self.radius, self.color)
 
+class Rectangle:
+    def __init__(self, x, y, width, height, color):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.color = color
+
+    def draw(self):
+        pyxel.rectb(self.x, self.y, self.width, self.height, self.color)
+
+
 class App:
     def __init__(self):
         pyxel.init(200, 300, fps=100)  # 画面サイズ、フレームレート
 
+        self.clock = Clock(110,5,0)
         self.scene = SCENE_TITLE
         self.score = 0
-        self.game_over_count = 0  # ボールが動いていないフレーム数をカウントする変数
+        self.game_over_limit = 90   # 90秒分のフレーム数
 
         pyxel.load("test.pyxres")
 
         self.ball = Ball(self)  # AppクラスのインスタンスをBallクラスに渡す
         self.targets = [Target(40, 40), Target(120, 80), Target(80, 100),Target(160,130),Target(30,130),Target(170,30),Target(50,80),Target(50,10),Target(160,60),Target(150,130)]
+
+  # 四角形を追加
+        self.rectangle = Rectangle(50,200, 100, 150, 13)
 
         pyxel.run(self.update, self.draw)  # 実行開始
 
@@ -113,6 +152,8 @@ class App:
         pyxel.run(self.update, self.draw)
 
     def update(self):
+        self.clock.update()
+
         if pyxel.btnp(pyxel.KEY_Q):
             pyxel.quit()
 
@@ -135,14 +176,6 @@ class App:
                     target.y = random.randint(20, 220)  # ランダムで繰り返す
                     self.score += 10
 
-            # ボールが動いていない場合、game_over_count をインクリメント
-            if not self.ball.is_moving:
-                self.game_over_count += 1
-
-            # ボールが一定のフレーム数以上動いていない場合、ゲームオーバー
-            if self.game_over_count > 300:  # 60フレーム（1秒）以上動いていない場合
-                self.scene = SCENE_GAMEOVER
-                self.score = 0                         
 
     def update_title_scene(self):
         if pyxel.btnp(13):
@@ -150,6 +183,10 @@ class App:
 
     def update_play_scene(self):
         if pyxel.btnp(13):
+            self.scene = SCENE_GAMEOVER
+
+        # 経過時間が一定以上でゲームオーバーにする
+        if self.clock.sec >= self.game_over_limit:
             self.scene = SCENE_GAMEOVER
 
         self.ball.update()
@@ -162,20 +199,13 @@ class App:
                 target.x = random.randint(20, 300)  # ランダムで繰り返す
                 target.y = random.randint(20, 220)  # ランダムで繰り返す
 
-        # ボールが動いていない場合、game_over_count をインクリメント
-        if not self.ball.is_moving:
-            self.game_over_count += 1
-
-        # ボールが一定のフレーム数以上動いていない場合、ゲームオーバー
-        if self.game_over_count > 300:  # 60フレーム（1秒）以上動いていない場合
-            self.scene = SCENE_GAMEOVER
-            self.score = 0
-
     def draw(self):
         # クリアする際に使用する色を指定
         background_color = 11  # 例として1を指定
         # 画面をクリアして背景色を変更
         pyxel.cls(background_color)  # 背景色
+
+        self.clock.draw()
 
         if self.scene == SCENE_TITLE:
             self.draw_title_scene()
@@ -188,12 +218,14 @@ class App:
 
     def draw_title_scene(self):
         pyxel.text(69, 200, "SFCmonster", pyxel.frame_count % 30)
-        pyxel.text(60, 126, "- PRESS ENTER -", 13)
-        pyxel.text(20,30,"bu-bu-smellkun",40)
+        pyxel.text(70, 250, "- PRESS ENTER -", 13)
+        pyxel.text(30,30,"bu-bu-smellkun",40)
         pyxel.text(40,90,"kentucky fried chicken",50)
         pyxel.text(110,70,"basuretutyo-da",60)
         pyxel.text(110,150,"risyuukikannsugisaru",20)
         pyxel.text(20,100,"kamo",30)
+        pyxel.text(20, 270, "time limit 1'30 Hit from inside the square", pyxel.COLOR_WHITE)
+
 
         # target
         specific_target0 = self.targets[0]
@@ -220,6 +252,9 @@ class App:
 
     def draw_play_scene(self):
         self.ball.draw()
+
+         # 四角形を描画
+        self.rectangle.draw()
 
         # target
         specific_target0 = self.targets[0]
@@ -254,8 +289,7 @@ class App:
             )
 
     def draw_gameover_scene(self):
-        pyxel.text(60, 66, "GAME OVER", 8)
-        pyxel.text(31, 126, "- PRESS ENTER -", 13)
+        pyxel.text(60, 66, "FINISH!!", 8)
 
         # target
         specific_target0 = self.targets[0]
